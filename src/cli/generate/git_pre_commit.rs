@@ -51,40 +51,12 @@ impl GitPreCommit {
     fn generate(&self) -> String {
         let task = &self.task;
         format!(
-            r#"#! /bin/sh
-
+            r#"#! /usr/bin/env bash
 set -eu
-
-TASK_NAME="{task}"
-
-: "${{TMPDIR:=/tmp}}"
-
-# get the reference to compare to
-REF="HEAD"
-if ! git rev-parse -q --verify "${{REF}}" > /dev/null; then
-  # use empty commit for new repositories
-  REF=$(git hash-object -t tree --stdin < /dev/null)
-fi
-
-PIPE=$(mktemp -u "${{TMPDIR%/}}/mise.${{TASK_NAME}}.XXXXXXXX")
-mkfifo -m 600 "${{PIPE}}"
-
-cleanup() {{
-  rm -f "${{PIPE}}"
-}}
-trap cleanup INT TERM
-
-# get files that have been added to the commit
-git diff-index --cached --name-only "${{REF}}" > "${{PIPE}}" &
-
-# add files to task arguments
 while read -r ARG; do
   set -- "$@" "${{ARG}}"
-done < "${{PIPE}}"
-
-cleanup
-
-exec mise run "${{TASK_NAME}}" "$@"
+done < <(git diff --cached --name-only --diff-filter=ACMR)
+exec mise run "{task}" "$@"
 "#
         )
     }
